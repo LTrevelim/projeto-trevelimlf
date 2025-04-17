@@ -6,25 +6,125 @@ output: html_document
 ---
 
 ```{r setup, include=FALSE}
-knitr::opts_chunk$set(echo = TRUE)
+knitr::opts_chunk$set(echo = TRUE,
+                      warning = FALSE,
+                      error = FALSE,
+                      message = FALSE)
 ```
 
-## R Markdown
+### Objetivo
 
-This is an R Markdown document. Markdown is a simple formatting syntax for authoring HTML, PDF, and MS Word documents. For more details on using R Markdown see <http://rmarkdown.rstudio.com>.
+Este script tem como objetivo realizar a etapa de faxina de dados, ou seja, aplicar transformações, padronizações e correções necessárias para garantir a qualidade dos dados utilizados nas análises. Aqui são tratados problemas como valores ausentes, formatação inconsistente, e possíveis outliers.
 
-When you click the **Knit** button a document will be generated that includes both content as well as the output of any embedded R code chunks within the document. You can embed an R code chunk like this:
+#### Instalação 
 
-```{r cars}
-summary(cars)
+```{r}
+# install.packages("devtools")
+# devtools::install_github("arpanosso/fco2r",force = TRUE)
 ```
 
-## Including Plots
-
-You can also embed plots, for example:
-
-```{r pressure, echo=FALSE}
-plot(pressure)
+#### Problemas na instalação
+```{r}
+# Sys.getenv("GITHUB_PAT")
+# Sys.unsetenv("GITHUB_PAT")
+# Sys.getenv("GITHUB_PAT")
 ```
 
-Note that the `echo = FALSE` parameter was added to the code chunk to prevent printing of the R code that generated the plot.
+#### Carregando Pacotes
+```{r}
+library(fco2r)
+library(tidyverse)
+library(geobr)
+library(ggpubr)
+theme_set(theme_bw())
+```
+
+#### Faxina - Dados de Emissão de CO2 do solo
+```{r}
+data_fco2 <- data_fco2 |> 
+  janitor::clean_names() |> 
+  mutate(
+    municipio = case_when(
+      municipio == "Selv?ra" ~ "Selvíria",
+      municipio == "Selv?ria" ~ "Selvíria",
+      municipio == "Prad?polis" ~ "Pradópolis",
+      TRUE ~ municipio
+    ))
+glimpse(data_fco2)
+```
+
+#### Faxina - XCO2 - NASA-OCO2
+```{r}
+oco2_br <- oco2_br %>% 
+  janitor::clean_names() |> 
+   mutate(
+           xco2 = xco2_moles_mole_1*1e06,
+           data = ymd_hms(time_yyyymmddhhmmss),
+           ano = year(data),
+           mes = month(data),
+           dia = day(data),
+           dia_semana = wday(data),
+           sif = (fluorescence_radiance_757nm_idp_ph_sec_1_m_2_sr_1_um_1*2.6250912*10^(-19)  + 1.5*fluorescence_radiance_771nm_idp_ph_sec_1_m_2_sr_1_um_1* 2.57743*10^(-19))/2,
+           sif = ifelse(sif > 0, sif, median(sif))
+           )
+glimpse(oco2_br)
+```
+
+```{r}
+brasil_geobr <- read_country(showProgress = FALSE)
+brasil_geobr |>  
+  ggplot() +
+  geom_sf(fill="white", color="black",
+          size=.15, show.legend = FALSE) +
+  geom_point(data=oco2_br %>%  
+                        sample_n(10000) ,
+             aes(x=longitude,y=latitude),
+             shape=1,
+             col="red",
+             alpha=01)+
+  labs(x="Longitude",y="Latitude")
+```
+Existe uma tendência de aumento monotônica mundial da concentração de CO~2~ na atmosfera, assim, ela deve ser retirada para podermos observar as tendências regionais. Observe que o sinal na variável X~CO2~ não apresenta a tendência descrita.
+
+```{r}
+oco2_br   |>   
+  ggplot(aes(x=data,y=xco2)) +
+  geom_point(shape=21,color="black",fill="gray") +
+  geom_smooth(method = "lm") +
+  stat_regline_equation(aes(
+  label =  paste(..eq.label.., ..rr.label.., sep = "*plain(\",\")~~")))
+```
+Análise de regressão linear simples para caracterização da tendência.
+
+
+```{r}
+mod_trend_xco2 <- lm(xco2 ~ data, 
+          data = oco2_br |> 
+            mutate( data = data - min(data)) 
+          )
+summary.lm(mod_trend_xco2)
+
+```
+```{r}
+a_co2 <- mod_trend_xco2$coefficients[[1]]
+b_co2 <- mod_trend_xco2$coefficients[[2]]
+oco2_br <- oco2_br |>
+  mutate(
+    data_modif = data -min(data),
+    xco2_est = a_co2+b_co2*data_modif,
+    delta = xco2_est-xco2,
+    xco2_detrend = as.numeric((a_co2-delta) - (mean(xco2) - a_co2))
+  )
+```
+
+Plot dos dados sem a tendência variável `xco2_detrend`.
+
+```{r}
+oco2_br   |>   
+  ggplot(aes(x=data,y=xco2_detrend)) +
+  geom_point(shape=21,color="black",fill="gray") +
+  geom_smooth(method = "lm") +
+  stat_regline_equation(aes(
+  label =  paste(..eq.label.., ..rr.label.., sep = "*plain(\",\")~~")))
+```
+

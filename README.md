@@ -18,10 +18,10 @@ ambientais. No entanto, a conversão a longo prazo de florestas nativas
 para agroecossistemas ainda é pouco compreendida, especialmente no
 contexto brasileiro. Assim, a hipótese central é que as mudanças no uso
 da terra para fins agrícolas alteram os atributos químicos e físicos do
-solo, induzindo mudanças na emissão de CO2. Este projeto visa investigar
-a emissão de CO<sub>2</sub> do solo (FCO2) em áreas agrícolas do bioma
-Cerrado, utilizando técnicas de aprendizado de máquina estatístico para
-modelar FCO2 com base em demais variáveis associadas.
+solo, induzindo mudanças na emissão de CO<sub>2</sub>. Este projeto visa
+investigar a emissão de CO<sub>2</sub> do solo (FCO2) em áreas agrícolas
+do bioma Cerrado, utilizando técnicas de aprendizado de máquina
+estatístico para modelar FCO2 com base em demais variáveis associadas.
 
 **Palavras-chaves**: respiração do solo, inteligência artificial,
 mudanças climáticas, aprendizado de máquina.
