@@ -11,25 +11,20 @@ knitr::opts_chunk$set(
 )
 ```
 
-# projeto-trevelimlf
+# APRENDIZADO DE MÁQUINA ESTATÍSTICO PARA ESTIMATIVA DA EMISSÃO DE CO~2~ DO SOLO EM ÁREAS AGRÍCOLAS
 
-<!-- badges: start -->
-<!-- badges: end -->
+**Beneficiário**: Luis Felipe Trevelim
 
-The goal of projeto-trevelimlf is to ...
+**Responsável**: Alan Rodrigo Panosso
 
-What is special about using `README.Rmd` instead of just `README.md`? You can include R chunks like so:
+**Resumo**: A concentração de gases de efeito estufa (GEE) na atmosfera, como o dióxido de carbono (CO~2~), aumentou consideravelmente devido a fontes antropogênicas. No Brasil, atividades agrícolas e florestais contribuem substancialmente para as emissões de CO~2~, principalmente devido ao desmatamento e à conversão de florestas nativas. Estudos anteriores demonstraram que FCO2 pode ser modelada com alta precisão usando uma grande quantidade de variáveis ambientais. No entanto, a conversão a longo prazo de florestas nativas para agroecossistemas ainda é pouco compreendida, especialmente no contexto brasileiro. Assim, a hipótese central é que as mudanças no uso da terra para fins agrícolas alteram os atributos químicos e físicos do solo, induzindo mudanças na emissão de CO2. Este projeto visa investigar a emissão de CO~2~ do solo (FCO2) em áreas agrícolas do bioma Cerrado, utilizando técnicas de aprendizado de máquina estatístico para modelar FCO2 com base em demais variáveis associadas.
 
-```{r cars}
-summary(cars)
-```
+**Palavras-chaves**: respiração do solo, inteligência artificial, mudanças climáticas, aprendizado de máquina.
 
-You'll still need to render `README.Rmd` regularly, to keep `README.md` up-to-date.
+### [1-Faxina](https://arpanosso.github.io/projeto-trevelimlf/Docs/faxina.html)
 
-You can also embed plots, for example:
+### 2 - Importação e Tratamento
 
-```{r pressure, echo = FALSE}
-plot(pressure)
-```
+### 3 - Análise Exploratória
 
-In that case, don't forget to commit and push the resulting figure files, so they display on GitHub.
+### 4 - Modelagem T1

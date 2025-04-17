@@ -1,33 +1,35 @@
 
 <!-- README.md is generated from README.Rmd. Please edit that file -->
 
-# projeto-trevelimlf
+# APRENDIZADO DE MÁQUINA ESTATÍSTICO PARA ESTIMATIVA DA EMISSÃO DE CO<sub>2</sub> DO SOLO EM ÁREAS AGRÍCOLAS
 
-<!-- badges: start -->
-<!-- badges: end -->
+**Beneficiário**: Luis Felipe Trevelim
 
-The goal of projeto-trevelimlf is to …
+**Responsável**: Alan Rodrigo Panosso
 
-What is special about using `README.Rmd` instead of just `README.md`?
-You can include R chunks like so:
+**Resumo**: A concentração de gases de efeito estufa (GEE) na atmosfera,
+como o dióxido de carbono (CO<sub>2</sub>), aumentou consideravelmente
+devido a fontes antropogênicas. No Brasil, atividades agrícolas e
+florestais contribuem substancialmente para as emissões de
+CO<sub>2</sub>, principalmente devido ao desmatamento e à conversão de
+florestas nativas. Estudos anteriores demonstraram que FCO2 pode ser
+modelada com alta precisão usando uma grande quantidade de variáveis
+ambientais. No entanto, a conversão a longo prazo de florestas nativas
+para agroecossistemas ainda é pouco compreendida, especialmente no
+contexto brasileiro. Assim, a hipótese central é que as mudanças no uso
+da terra para fins agrícolas alteram os atributos químicos e físicos do
+solo, induzindo mudanças na emissão de CO2. Este projeto visa investigar
+a emissão de CO<sub>2</sub> do solo (FCO2) em áreas agrícolas do bioma
+Cerrado, utilizando técnicas de aprendizado de máquina estatístico para
+modelar FCO2 com base em demais variáveis associadas.
 
-``` r
-summary(cars)
-#>      speed           dist       
-#>  Min.   : 4.0   Min.   :  2.00  
-#>  1st Qu.:12.0   1st Qu.: 26.00  
-#>  Median :15.0   Median : 36.00  
-#>  Mean   :15.4   Mean   : 42.98  
-#>  3rd Qu.:19.0   3rd Qu.: 56.00  
-#>  Max.   :25.0   Max.   :120.00
-```
+**Palavras-chaves**: respiração do solo, inteligência artificial,
+mudanças climáticas, aprendizado de máquina.
 
-You’ll still need to render `README.Rmd` regularly, to keep `README.md`
-up-to-date.
+### [1-Faxina](https://arpanosso.github.io/projeto-trevelimlf/Docs/faxina.html)
 
-You can also embed plots, for example:
+### 2 - Importação e Tratamento
 
-![](README_files/figure-gfm/pressure-1.png)<!-- -->
+### 3 - Análise Exploratória
 
-In that case, don’t forget to commit and push the resulting figure
-files, so they display on GitHub.
+### 4 - Modelagem T1
