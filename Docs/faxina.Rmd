@@ -127,18 +127,97 @@ oco2_br   |>
   label =  paste(..eq.label.., ..rr.label.., sep = "*plain(\",\")~~")))
 ```
 
+
+#### Padronização  das coordenadas
+
 #### Unindo os bancos de dados
+```{r}
+library(sf)
+
+# Suponha que seus dados em coordenadas projetadas estejam assim:
+df_proj <- data.frame(x = 782062.7, y = 9332701.3)  # exemplo UTM
+# Define o sistema de referência (ex: UTM zona 21S - SIRGAS 2000)
+sf_proj <- st_as_sf(data_fco2[c("longitude_muni","latitude_muni")], coords = c("longitude_muni", "latitude_muni"), crs = 31981)
+
+# Converte para coordenadas geográficas (long/lat)
+sf_geo <- st_transform(sf_proj, crs = 4326)
+
+# Visualiza resultado
+data_fco2[c("longitude_muni","latitude_muni")] <- st_coordinates(sf_geo)
+```
+
+```{r}
+data_fco2 <- data_fco2  |>  
+  mutate(year = year(data),
+         month = month(data),
+         xco2 = NA,
+         xco2_detrend = NA,
+         sif = NA
+  )
+dist<-0
+for(i in 1:nrow(data_fco2)){
+  x<- data_fco2[i,c(12)]
+  y<- data_fco2[i,c(13)]
+  ano <- data_fco2[i,"year"]
+  mes <- data_fco2[i,"month"]
+  
+  df_aux <- oco2_br |> 
+    filter(year == ano, month == mes) |> 
+    mutate(
+      dist = sqrt((longitude-(x))^2+(latitude-(y))^2)
+    ) |> 
+    arrange(dist) |> 
+    slice(1)
+  
+  if(nrow(df_aux)!=0){
+    data_fco2[i,"xco2"] <- df_aux$xco2
+    data_fco2[i,"xco2_detrend"] <- df_aux$xco2_detrend
+    data_fco2[i,"sif"] <- df_aux$sif
+  }
+  #print(paste(i,"/",nrow(data_fco2)))
+}
+data_fco2 |> tail()
+```
 
 
 ```{r}
-data_set <- left_join(data_fco2  |>  
-            mutate(year = year(data),
-                   month = month(data)
-                   ), 
-          oco2_br  |>  
-            select(data,month,year,longitude,latitude,xco2,xco2_detrend,sif,fluorescence_radiance_757nm_idp_ph_sec_1_m_2_sr_1_um_1,fluorescence_radiance_771nm_idp_ph_sec_1_m_2_sr_1_um_1), by = c("year","month") )  |>  
-  mutate(dist = sqrt((longitude-(-51.423519))^2+(latitude-(-20.362911))^2)) |> 
-  filter(dist <= .16, fco2 <= 30 ) |> 
-  select(-fluorescence_radiance_757nm_idp_ph_sec_1_m_2_sr_1_um_1, -fluorescence_radiance_771nm_idp_ph_sec_1_m_2_sr_1_um_1, -dist)
+tab_medias <- data_fco2  |>  
+  # mutate(SIF = ifelse(SIF <=0, mean(data_set$SIF, na.rm=TRUE),SIF)) %>% 
+  group_by(year, month, municipio)  |>  
+  summarise(fco2 = mean(fco2, na.rm=TRUE),
+            xco2 = mean(xco2_detrend, na.rm=TRUE),
+            sif = mean(sif, na.rm=TRUE))
+
+tab_medias |>  
+  drop_na() |> 
+  filter(sif > 0)  |>  
+  ggplot(aes(y=fco2, x=xco2)) +
+  geom_point(size=3, shape=21, fill="gray") +
+  geom_smooth(method = "lm", se=FALSE,
+              ldw=2,color="red") +
+  stat_regline_equation(aes(
+    label =  paste(..eq.label.., ..rr.label.., sep = "*plain(\",\")~~")),size=5, label.x.npc = .4)
+
+tab_medias |>  
+  drop_na() |> 
+  filter(sif > 0)  |>  
+  ggplot(aes(y=fco2, x=sif)) +
+  geom_point(size=3, shape=21, fill="gray") +
+  geom_smooth(method = "lm", se=FALSE,
+              ldw=2,color="red") +
+  stat_regline_equation(aes(
+    label =  paste(..eq.label.., ..rr.label.., sep = "*plain(\",\")~~")),size=5, label.x.npc = .4)
+
+
+tab_medias |>  
+  drop_na() |> 
+  filter(sif > 0)  |>  
+  ggplot(aes(y=sif, x=xco2)) +
+  geom_point(size=3, shape=21, fill="gray") +
+  geom_smooth(method = "lm", se=FALSE,
+              ldw=2,color="red") +
+  stat_regline_equation(aes(
+    label =  paste(..eq.label.., ..rr.label.., sep = "*plain(\",\")~~")),size=5, label.x.npc = .4)
 ```
+
 
