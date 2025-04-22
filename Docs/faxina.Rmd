@@ -37,6 +37,7 @@ library(tidyverse)
 library(geobr)
 library(ggpubr)
 library(sf)
+source("../R/functions.R")
 theme_set(theme_bw())
 ```
 
@@ -141,9 +142,8 @@ oco2_br   |>
 Para unir os bancos de dados, inicialmente será necessário transformar as coordenadas do banco `data_fco2`. Ideal é buscar o ponto central do município nos dados do ibge, por meio, no pacote `{geobr}`.
 
 ```{r}
-municipality <- geobr::read_municipality()
+# Objeto municipality previamente criado ao chamar o script source("..//R//functions.R") 
 my_municipaly <- data_fco2$ municipio |> unique()
-# my_municipaly[5] <- "Aparecida Do Taboado"
 municipaly_coord <- data.frame(municipio="",
                                long=1:length(my_municipaly),
                                lat=0)
@@ -168,9 +168,13 @@ Agora precisamos selecionar no banco de dados `oco2_br` quais pontos estão mais
 data_fco2 <- data_fco2  |>  
   mutate(year = year(data),
          month = month(data),
-         xco2 = NA,
-         xco2_detrend = NA,
-         sif = NA
+         xco2_1 = NA,
+         xco2_detrend_1 = NA,
+         sif_1 = NA,
+         xco2_5 = NA,
+         xco2_detrend_5 = NA,
+         sif_5 = NA,
+         dist = NA
   )
 
 # Busca pelo ponto mais próximo
@@ -186,12 +190,15 @@ for(i in 1:nrow(data_fco2)){
       dist = sqrt((longitude-(x))^2+(latitude-(y))^2)
     ) |> 
     arrange(dist) |> 
-    slice(1:3)
+    slice(1:5)
   
   if(nrow(df_aux)!=0){
-    data_fco2[i,"xco2"] <- df_aux$xco2 |> mean()
-    data_fco2[i,"xco2_detrend"] <- df_aux$xco2_detrend |> mean()
-    data_fco2[i,"sif"] <- df_aux$sif |> mean()
+    data_fco2[i,"xco2_1"] <- df_aux$xco2[1]
+    data_fco2[i,"xco2_detrend_1"] <- df_aux$xco2_detrend[1]
+    data_fco2[i,"sif_1"] <- df_aux$sif[1]
+    data_fco2[i,"xco2_5"] <- df_aux$xco2 |> mean()
+    data_fco2[i,"xco2_detrend_5"] <- df_aux$xco2_detrend |> mean()
+    data_fco2[i,"sif_5"] <- df_aux$sif |> mean()
     data_fco2[i,"dist"] <- df_aux$dist[1]
   }
   #print(paste(i,"/",nrow(data_fco2)))
@@ -204,8 +211,8 @@ tab_medias <- data_fco2  |>
   # mutate(SIF = ifelse(SIF <=0, mean(data_set$SIF, na.rm=TRUE),SIF)) %>% 
   group_by(year, month, municipio)  |>  
   summarise(fco2 = mean(fco2, na.rm=TRUE),
-            xco2 = mean(xco2_detrend, na.rm=TRUE),
-            sif = mean(sif, na.rm=TRUE))
+            xco2 = mean(xco2_detrend_1, na.rm=TRUE),
+            sif = mean(sif_1, na.rm=TRUE))
 
 tab_medias |>  
   drop_na() |> 
@@ -240,3 +247,42 @@ tab_medias |>
 ```
 
 
+```{r}
+tab_medias <- data_fco2  |>  
+  # mutate(SIF = ifelse(SIF <=0, mean(data_set$SIF, na.rm=TRUE),SIF)) %>% 
+  group_by(year, month, municipio)  |>  
+  summarise(fco2 = mean(fco2, na.rm=TRUE),
+            xco2 = mean(xco2_detrend_5, na.rm=TRUE),
+            sif = mean(sif_5, na.rm=TRUE))
+
+tab_medias |>  
+  drop_na() |> 
+  filter(sif > 0)  |>  
+  ggplot(aes(y=fco2, x=xco2)) +
+  geom_point(size=3, shape=21, fill="gray") +
+  geom_smooth(method = "lm", se=FALSE,
+              ldw=2,color="red") +
+  stat_regline_equation(aes(
+    label =  paste(..eq.label.., ..rr.label.., sep = "*plain(\",\")~~")),size=5, label.x.npc = .4)
+
+tab_medias |>  
+  drop_na() |> 
+  filter(sif > 0)  |>  
+  ggplot(aes(y=fco2, x=sif)) +
+  geom_point(size=3, shape=21, fill="gray") +
+  geom_smooth(method = "lm", se=FALSE,
+              ldw=2,color="red") +
+  stat_regline_equation(aes(
+    label =  paste(..eq.label.., ..rr.label.., sep = "*plain(\",\")~~")),size=5, label.x.npc = .4)
+
+
+tab_medias |>  
+  drop_na() |> 
+  filter(sif > 0)  |>  
+  ggplot(aes(y=sif, x=xco2)) +
+  geom_point(size=3, shape=21, fill="gray") +
+  geom_smooth(method = "lm", se=FALSE,
+              ldw=2,color="red") +
+  stat_regline_equation(aes(
+    label =  paste(..eq.label.., ..rr.label.., sep = "*plain(\",\")~~")),size=5, label.x.npc = .4)
+```
