@@ -36,6 +36,7 @@ library(fco2r)
 library(tidyverse)
 library(geobr)
 library(ggpubr)
+library(sf)
 theme_set(theme_bw())
 ```
 
@@ -48,12 +49,16 @@ data_fco2 <- data_fco2 |>
       municipio == "Selv?ra" ~ "Selvíria",
       municipio == "Selv?ria" ~ "Selvíria",
       municipio == "Prad?polis" ~ "Pradópolis",
+      municipio == "Aparecida do Tabuado" ~ "Aparecida Do Taboado",
       TRUE ~ municipio
     ))
 glimpse(data_fco2)
 ```
 
 #### Faxina - XCO2 - NASA-OCO2
+
+Cálculo da SIF 
+
 ```{r}
 oco2_br <- oco2_br %>% 
   janitor::clean_names() |> 
@@ -65,9 +70,12 @@ oco2_br <- oco2_br %>%
            day = day(data),
            w_day = wday(data),
            sif = (fluorescence_radiance_757nm_idp_ph_sec_1_m_2_sr_1_um_1*2.6250912*10^(-19)  + 1.5*fluorescence_radiance_771nm_idp_ph_sec_1_m_2_sr_1_um_1* 2.57743*10^(-19))/2,
-           sif = ifelse(sif > 0, sif, median(sif))
+           sif = ifelse(sif <= 0 | sif > 10, median(sif), sif)
            )
-glimpse(oco2_br)
+oco2_br |> 
+  ggplot(aes(x = sif,y=..density..)) +
+  geom_histogram(bins = 80,color="black",fill="gray") +
+  coord_cartesian(xlim = c(0,4))
 ```
 
 ```{r}
@@ -128,25 +136,35 @@ oco2_br   |>
 ```
 
 
-#### Padronização  das coordenadas
-
 #### Unindo os bancos de dados
+
+Para unir os bancos de dados, inicialmente será necessário transformar as coordenadas do banco `data_fco2`. Ideal é buscar o ponto central do município nos dados do ibge, por meio, no pacote `{geobr}`.
+
 ```{r}
-library(sf)
-
-# Suponha que seus dados em coordenadas projetadas estejam assim:
-df_proj <- data.frame(x = 782062.7, y = 9332701.3)  # exemplo UTM
-# Define o sistema de referência (ex: UTM zona 21S - SIRGAS 2000)
-sf_proj <- st_as_sf(data_fco2[c("longitude_muni","latitude_muni")], coords = c("longitude_muni", "latitude_muni"), crs = 31981)
-
-# Converte para coordenadas geográficas (long/lat)
-sf_geo <- st_transform(sf_proj, crs = 4326)
-
-# Visualiza resultado
-data_fco2[c("longitude_muni","latitude_muni")] <- st_coordinates(sf_geo)
+municipality <- geobr::read_municipality()
+my_municipaly <- data_fco2$ municipio |> unique()
+# my_municipaly[5] <- "Aparecida Do Taboado"
+municipaly_coord <- data.frame(municipio="",
+                               long=1:length(my_municipaly),
+                               lat=0)
+for(i in 1:length(my_municipaly)){
+  muni_aux <- municipality |> 
+    filter(name_muni == my_municipaly[i]) 
+  coord_aux <- muni_aux |> pluck(5) |> pluck(1) |> as.matrix()  
+  municipaly_coord[i,1] <- muni_aux$name_muni
+  municipaly_coord[i,2] <- coord_aux[,1] |> mean()
+  municipaly_coord[i,3]  <- coord_aux[,2] |> mean()
+}
+data_fco2 <- data_fco2 |> left_join(
+  municipaly_coord, by="municipio"
+)
 ```
 
+
+Agora precisamos selecionar no banco de dados `oco2_br` quais pontos estão mais próximos daquele que observamos em campo. Para isso vamos pegar a média dos $3$ pontos mais próximos de XCO2 e SIF.
+
 ```{r}
+# Criando colunas  no banco de dados
 data_fco2 <- data_fco2  |>  
   mutate(year = year(data),
          month = month(data),
@@ -154,10 +172,11 @@ data_fco2 <- data_fco2  |>
          xco2_detrend = NA,
          sif = NA
   )
-dist<-0
+
+# Busca pelo ponto mais próximo
 for(i in 1:nrow(data_fco2)){
-  x<- data_fco2[i,c(12)]
-  y<- data_fco2[i,c(13)]
+  x<- data_fco2[i,"long"]
+  y<- data_fco2[i,"lat"]
   ano <- data_fco2[i,"year"]
   mes <- data_fco2[i,"month"]
   
@@ -167,16 +186,16 @@ for(i in 1:nrow(data_fco2)){
       dist = sqrt((longitude-(x))^2+(latitude-(y))^2)
     ) |> 
     arrange(dist) |> 
-    slice(1)
+    slice(1:3)
   
   if(nrow(df_aux)!=0){
-    data_fco2[i,"xco2"] <- df_aux$xco2
-    data_fco2[i,"xco2_detrend"] <- df_aux$xco2_detrend
-    data_fco2[i,"sif"] <- df_aux$sif
+    data_fco2[i,"xco2"] <- df_aux$xco2 |> mean()
+    data_fco2[i,"xco2_detrend"] <- df_aux$xco2_detrend |> mean()
+    data_fco2[i,"sif"] <- df_aux$sif |> mean()
+    data_fco2[i,"dist"] <- df_aux$dist[1]
   }
   #print(paste(i,"/",nrow(data_fco2)))
 }
-data_fco2 |> tail()
 ```
 
 
