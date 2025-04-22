@@ -205,12 +205,14 @@ for(i in 1:nrow(data_fco2)){
 }
 ```
 
+Valor único do mais próximos.
 
 ```{r}
 tab_medias <- data_fco2  |>  
   # mutate(SIF = ifelse(SIF <=0, mean(data_set$SIF, na.rm=TRUE),SIF)) %>% 
   group_by(year, month, municipio)  |>  
   summarise(fco2 = mean(fco2, na.rm=TRUE),
+            xco2_tend = mean(xco2_1,na.rm=TRUE),
             xco2 = mean(xco2_detrend_1, na.rm=TRUE),
             sif = mean(sif_1, na.rm=TRUE))
 
@@ -227,6 +229,16 @@ tab_medias |>
 tab_medias |>  
   drop_na() |> 
   filter(sif > 0)  |>  
+  ggplot(aes(y=fco2, x=xco2_tend)) +
+  geom_point(size=3, shape=21, fill="gray") +
+  geom_smooth(method = "lm", se=FALSE,
+              ldw=2,color="red") +
+  stat_regline_equation(aes(
+    label =  paste(..eq.label.., ..rr.label.., sep = "*plain(\",\")~~")),size=5, label.x.npc = .4)
+
+tab_medias |>  
+  drop_na() |> 
+  filter(sif > 0)  |>  
   ggplot(aes(y=fco2, x=sif)) +
   geom_point(size=3, shape=21, fill="gray") +
   geom_smooth(method = "lm", se=FALSE,
@@ -246,12 +258,14 @@ tab_medias |>
     label =  paste(..eq.label.., ..rr.label.., sep = "*plain(\",\")~~")),size=5, label.x.npc = .4)
 ```
 
+Médias dos 5 mais próximos.
 
 ```{r}
 tab_medias <- data_fco2  |>  
   # mutate(SIF = ifelse(SIF <=0, mean(data_set$SIF, na.rm=TRUE),SIF)) %>% 
   group_by(year, month, municipio)  |>  
   summarise(fco2 = mean(fco2, na.rm=TRUE),
+            xco2_tend = mean(xco2_5,na.rm=TRUE),
             xco2 = mean(xco2_detrend_5, na.rm=TRUE),
             sif = mean(sif_5, na.rm=TRUE))
 
@@ -268,6 +282,16 @@ tab_medias |>
 tab_medias |>  
   drop_na() |> 
   filter(sif > 0)  |>  
+  ggplot(aes(y=fco2, x=xco2_tend)) +
+  geom_point(size=3, shape=21, fill="gray") +
+  geom_smooth(method = "lm", se=FALSE,
+              ldw=2,color="red") +
+  stat_regline_equation(aes(
+    label =  paste(..eq.label.., ..rr.label.., sep = "*plain(\",\")~~")),size=5, label.x.npc = .4)
+
+tab_medias |>  
+  drop_na() |> 
+  filter(sif > 0)  |>  
   ggplot(aes(y=fco2, x=sif)) +
   geom_point(size=3, shape=21, fill="gray") +
   geom_smooth(method = "lm", se=FALSE,
@@ -286,3 +310,19 @@ tab_medias |>
   stat_regline_equation(aes(
     label =  paste(..eq.label.., ..rr.label.., sep = "*plain(\",\")~~")),size=5, label.x.npc = .4)
 ```
+
+#### Carregando dados meteorológios
+
+```{r}
+dados_estacao_isa <- readxl::read_excel("../data-raw/estacao_meteorologia_ilha_solteira.xlsx", na = "NA")  |>  
+  janitor::clean_names() |> 
+  drop_na()
+glimpse(dados_estacao_isa)
+visdat::vis_miss(dados_estacao_isa)
+```
+
+```{r}
+# left_join(data_fco2, dados_estacao_isa, by = "data")  |>                            mutate(range_t = tmax-tmin) |> 
+#   write_rds("../data/data-set.rds")
+```
+

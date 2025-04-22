@@ -1,0 +1,43 @@
+---
+title: "Importação e Tratamento"
+author: "Trevelim, LP; Panosso, AR"
+date: "2025-04-22"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE,
+                      warning = FALSE,
+                      error = FALSE,
+                      message = FALSE)
+```
+
+### Objetivo
+
+Este script tem como objetivo realizar a etapa de faxina de dados, ou seja, aplicar transformações, padronizações e correções necessárias para garantir a qualidade dos dados utilizados nas análises. Aqui são tratados problemas como valores ausentes, formatação inconsistente, e possíveis outliers.
+
+#### Instalação 
+
+```{r}
+# install.packages("devtools")
+# devtools::install_github("arpanosso/fco2r",force = TRUE)
+```
+
+#### Problemas na instalação
+```{r}
+# Sys.getenv("GITHUB_PAT")
+# Sys.unsetenv("GITHUB_PAT")
+# Sys.getenv("GITHUB_PAT")
+```
+
+#### Carregando Pacotes
+```{r}
+library(fco2r)
+library(tidyverse)
+library(geobr)
+library(ggpubr)
+library(sf)
+source("../R/functions.R")
+theme_set(theme_bw())
+```
+

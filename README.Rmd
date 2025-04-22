@@ -23,7 +23,7 @@ knitr::opts_chunk$set(
 
 ### [1-Faxina](https://arpanosso.github.io/projeto-trevelimlf/Docs/faxina.html)
 
-### 2 - Importação e Tratamento 
+### [2-Importação e Tratamento](https://arpanosso.github.io/projeto-trevelimlf/Docs/importacao_tratamento.html)
 
 ### 3 - Análise Exploratória
 
