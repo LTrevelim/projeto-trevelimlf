@@ -14,30 +14,84 @@ knitr::opts_chunk$set(echo = TRUE,
 
 ### Objetivo
 
-Este script tem como objetivo realizar a etapa de faxina de dados, ou seja, aplicar transformações, padronizações e correções necessárias para garantir a qualidade dos dados utilizados nas análises. Aqui são tratados problemas como valores ausentes, formatação inconsistente, e possíveis outliers.
-
-#### Instalação 
-
-```{r}
-# install.packages("devtools")
-# devtools::install_github("arpanosso/fco2r",force = TRUE)
-```
-
-#### Problemas na instalação
-```{r}
-# Sys.getenv("GITHUB_PAT")
-# Sys.unsetenv("GITHUB_PAT")
-# Sys.getenv("GITHUB_PAT")
-```
+Este script tem como objetivo realizar a importação dos dados brutos e aplicar os primeiros tratamentos necessários, como seleção de colunas relevantes, ajustes em nomes de variáveis, padronização de formatos e tipos de dados, além da criação de variáveis auxiliares que serão utilizadas nas análises subsequentes.
 
 #### Carregando Pacotes
+
 ```{r}
-library(fco2r)
 library(tidyverse)
 library(geobr)
 library(ggpubr)
 library(sf)
-source("../R/functions.R")
+# source("../R/functions.R")
 theme_set(theme_bw())
 ```
 
+#### Importação de Dados
+
+```{r}
+data_set <- read_rds("../data/data-set.rds") |> 
+  filter(prof == "0-0.1") |> # Deixar apenas a primeira profundidade de 0-10 cm
+  mutate(
+    longitude_muni = long, # vamos deixar apenas um par de coordenadas
+    latitude_muni = lat,
+    manejo = as_factor(manejo),
+    tratamento = as_factor(tratamento)
+  ) |> 
+  rename(
+    xco2 = xco2_detrend_5,
+    xco2_trend = xco2_5,
+    sif = sif_5,
+    ph = p_h
+  ) |> 
+  select(-c(prof, long, lat, id, dist, # retirando variáveis
+            month, year, estado, municipio, xco2_1, sif_1, xco2_detrend_1,
+            data_preparo, conversao, cobertura, revolvimento_solo)) |> 
+  relocate(data, cultura, x, y, longitude_muni, latitude_muni)
+glimpse(data_set)
+```
+```{r}
+skimr::skim(data_set)
+```
+```{r}
+visdat::vis_miss(data_set)
+```
+```{r}
+data_set  |> 
+  mutate(fco2_log = log(fco2)) |> 
+  select(fco2,fco2_log,ts,us) |> 
+  GGally::ggpairs()
+```
+
+```{r}
+data_set  |> 
+  mutate(fco2_log = log(fco2)) |> 
+  select(fco2,fco2_log,ph:h_al) |> 
+  GGally::ggpairs()
+```
+```{r}
+data_set  |> 
+  mutate(fco2_log = log(fco2)) |> 
+  select(fco2,fco2_log,sb:pla) |> 
+  GGally::ggpairs()
+```
+
+```{r}
+data_set  |> 
+  mutate(fco2_log = log(fco2)) |> 
+  select(fco2,fco2_log,at:hlifs) |> 
+  GGally::ggpairs()
+```
+
+```{r}
+data_set  |> 
+  mutate(fco2_log = log(fco2)) |> 
+  select(fco2,fco2_log,xco2_trend:umin) |> 
+  GGally::ggpairs()
+```
+```{r}
+data_set  |> 
+  mutate(fco2_log = log(fco2)) |> 
+  select(fco2,fco2_log,pk_pa:range_t) |> 
+  GGally::ggpairs()
+```
