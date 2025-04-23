@@ -95,3 +95,26 @@ data_set  |>
   select(fco2,fco2_log,pk_pa:range_t) |> 
   GGally::ggpairs()
 ```
+
+### Histogramas
+```{r}
+my_vars <- data_set |> 
+  select(fco2:range_t) |> 
+  names()
+map(my_vars,~{
+  var_sym <- sym(.x)
+  x <- data_set |>pull(!!var_sym)
+  x<-na.omit(x)
+  plot_x<-data_set |>
+    select(!!.x) |>
+    drop_na() |>
+    ggplot(aes(x=!!var_sym)) +
+    geom_histogram(boundary=0, color="black", fill="gray",
+                   bins = nclass.FD(x))
+  print(plot_x)
+  print(summary(x))
+
+})
+
+```
+
