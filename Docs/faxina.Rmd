@@ -93,6 +93,8 @@ brasil_geobr |>
              alpha=01)+
   labs(x="Longitude",y="Latitude")
 ```
+
+
 Existe uma tendência de aumento monotônica mundial da concentração de CO~2~ na atmosfera, assim, ela deve ser retirada para podermos observar as tendências regionais. Observe que o sinal na variável X~CO2~ não apresenta a tendência descrita.
 
 ```{r}
