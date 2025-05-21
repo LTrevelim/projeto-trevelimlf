@@ -45,12 +45,35 @@ data_set <- read_rds("../data/data-set.rds") |>
     ph = p_h
   ) |> 
   select(-c(prof, long, lat, id, dist, # retirando variáveis
-            month, year, estado, municipio, xco2_1, sif_1, xco2_detrend_1,
+            estado, municipio, xco2_1, sif_1, xco2_detrend_1,
             data_preparo, conversao, cobertura, revolvimento_solo)) |> 
-  relocate(data, cultura, x, y, longitude_muni, latitude_muni)
-glimpse(data_set)
-```
-```{r}
+  relocate(data, year, month, cultura, x, y, longitude_muni, latitude_muni) |> 
+  group_by(data) |> 
+  mutate(
+    fco2 = ifelse(fco2<=0, median(fco2,na.rm=TRUE), fco2),
+    fco2 = ifelse(fco2>20, median(fco2,na.rm=TRUE), fco2),
+    ts = ifelse(ts>40, median(ts,na.rm=TRUE), ts),
+    macro = ifelse(macro<=0, median(macro,na.rm=TRUE), macro),
+    vtp = ifelse(vtp<=0, median(vtp,na.rm=TRUE), vtp),
+    pla = ifelse(pla<=0, median(pla,na.rm=TRUE), pla),
+    sb = ifelse(sb >= 150, median(sb,na.rm=TRUE),sb ),
+    mg = ifelse(mg >= 50, median(mg,na.rm=TRUE),mg ),
+    ca = ifelse(ca >= 80, median(ca,na.rm=TRUE),ca ),
+    p = ifelse(p >= 160, median(p,na.rm=TRUE),p ),
+    ph = ifelse(ph == 52, 5.2,ph ),
+    k = ifelse(k == 34, 0.34,k ),
+    at = ifelse(at > 1000, at/10,at ),
+    arg = ifelse(arg > 1000, arg/10,arg ),
+    silte = 1000-arg-at,
+    silte = ifelse(year == 2014, NA,silte),
+    arg = ifelse(year == 2014, NA,arg),
+    at = ifelse(year == 2014, NA,at),
+    macro = ifelse(macro < 1, macro*100,macro),
+    micro = ifelse(micro < 1, micro*100,micro),
+    vtp = ifelse(vtp < 1, vtp*100,vtp),
+    ) |> 
+  ungroup()
+
 skimr::skim(data_set)
 ```
 ```{r}
@@ -112,9 +135,20 @@ map(my_vars,~{
     geom_histogram(boundary=0, color="black", fill="gray",
                    bins = nclass.FD(x))
   print(plot_x)
-  print(summary(x))
-
+  # print(summary(x))
 })
-
 ```
+
+
+
+```{r}
+data_set |> 
+select(cultura,year, hlifs) |> drop_na() |> arrange() |> 
+group_by(year,cultura) |> 
+  summarise(
+  hlifs = mean(hlifs)
+  )
+  
+```
+
 

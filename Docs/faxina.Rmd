@@ -320,11 +320,29 @@ dados_estacao_isa <- readxl::read_excel("../data-raw/estacao_meteorologia_ilha_s
   janitor::clean_names() |> 
   drop_na()
 glimpse(dados_estacao_isa)
-visdat::vis_miss(dados_estacao_isa)
 ```
 
+
 ```{r}
-# left_join(data_fco2, dados_estacao_isa, by = "data")  |>                            mutate(range_t = tmax-tmin) |> 
-#   write_rds("../data/data-set.rds")
+dados_estacao_jbk <- readxl::read_excel("../data-raw/estacao_meteorologia_jaboticabal.xlsx")  |>  
+  janitor::clean_names()
+glimpse(dados_estacao_isa)
+```
+
+
+```{r}
+dados_estacao <- dados_estacao_isa |> 
+  add_row(dados_estacao_jbk |> 
+            select(-c(saldo_w_m,fluxo_w_m,et_pm_mm_dia,et_tca_mm_dia,
+                      vel)) |> 
+            mutate(dir_vel=as.double(dir_vel))
+          ) |> arrange(data)
+visdat::vis_miss(dados_estacao)
+```
+
+
+```{r}
+left_join(data_fco2, dados_estacao, by = "data")  |>                            mutate(range_t = tmax-tmin) |> 
+     write_rds("../data/data-set.rds")
 ```
 
