@@ -326,7 +326,7 @@ glimpse(dados_estacao_isa)
 ```{r}
 dados_estacao_jbk <- readxl::read_excel("../data-raw/estacao_meteorologia_jaboticabal.xlsx")  |>  
   janitor::clean_names()
-glimpse(dados_estacao_isa)
+glimpse(dados_estacao_jbk)
 ```
 
 
@@ -342,7 +342,17 @@ visdat::vis_miss(dados_estacao)
 
 
 ```{r}
-left_join(data_fco2, dados_estacao, by = "data")  |>                            mutate(range_t = tmax-tmin) |> 
-     write_rds("../data/data-set.rds")
+visdat::vis_miss(data_fco2)
+```
+
+
+```{r}
+data_fco2 <- left_join(data_fco2, dados_estacao, by = "data") 
+visdat::vis_miss(data_fco2[18:length(data_fco2)])
+```
+
+
+```{r}
+write_rds("../data/data-set.rds")
 ```
 
