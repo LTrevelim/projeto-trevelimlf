@@ -30,7 +30,7 @@ theme_set(theme_bw())
 #### Importação de Dados
 
 ```{r}
-data_set <- read_rds("../data/data-set.rds") |> 
+data_set <- read_rds("../data/data-set-fco2.rds") |> 
   filter(prof == "0-0.1") |> # Deixar apenas a primeira profundidade de 0-10 cm
   mutate(
     longitude_muni = long, # vamos deixar apenas um par de coordenadas
@@ -115,14 +115,14 @@ data_set  |>
 ```{r}
 data_set  |> 
   mutate(fco2_log = log(fco2)) |> 
-  select(fco2,fco2_log,pk_pa:range_t) |> 
+  select(fco2,fco2_log,pk_pa:inso) |> 
   GGally::ggpairs()
 ```
 
 ### Histogramas
 ```{r}
 my_vars <- data_set |> 
-  select(fco2:range_t) |> 
+  select(fco2:inso) |> 
   names()
 map(my_vars,~{
   var_sym <- sym(.x)

@@ -353,6 +353,6 @@ visdat::vis_miss(data_fco2[18:length(data_fco2)])
 
 
 ```{r}
-write_rds("../data/data-set.rds")
+write_rds(data_fco2,"../data/data-set-fco2.rds")
 ```
 
