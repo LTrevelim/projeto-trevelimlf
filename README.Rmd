@@ -7,6 +7,7 @@ output: github_document
 ```{r, include = FALSE}
 knitr::opts_chunk$set(
   collapse = TRUE,
+  warning = FALSE, message = FALSE, error = FALSE,
   comment = "#>"
 )
 ```
@@ -25,6 +26,226 @@ knitr::opts_chunk$set(
 
 ### [2-Importação e Tratamento](https://arpanosso.github.io/projeto-trevelimlf/Docs/importacao_tratamento.html)
 
-### 3 - Análise Exploratória
+### 3 - Aprendizado de Máquina
 
-### 4 - Modelagem T1
+#### Carregando os pacotes
+```{r}
+library(tidyverse)
+library(patchwork)
+library(ggspatial)
+library(readxl)
+library(skimr)
+library(tidymodels)
+library(ISLR)
+library(modeldata)
+library(vip)
+library(ggpubr)
+theme_set(theme_bw())
+```
+
+#### Entrando com o banco de dados
+```{r}
+data_set <- read_rds("data/data-set.rds")
+glimpse(data_set)
+```
+
+### Dividindo a base entre treino e teste
+```{r}
+fco2_initial_split <- initial_split(data_set, prop = 0.80)
+fco2_train <- training(fco2_initial_split)
+# fco2_test <- testing(fco2_initial_split)
+# visdat::vis_miss(fco2_test)
+fco2_train  %>% 
+  ggplot(aes(x=fco2, y=..density..))+
+  geom_histogram(bins = 30, color="black",  fill="lightgray")+
+  geom_density(alpha=.05,fill="red")+
+  theme_bw() +
+  labs(x="fco2 - treino", y = "Densidade")
+```
+
+```{r}
+fco2_testing <- testing(fco2_initial_split)
+fco2_testing  %>% 
+  ggplot(aes(x=fco2, y=..density..))+
+  geom_histogram(bins = 30, color="black",  fill="lightgray")+
+  geom_density(alpha=.05,fill="blue")+
+  theme_bw() +
+  labs(x="fco2 - teste", y = "Densidade")
+```
+
+
+### Definindo a Reamostragem
+```{r}
+fco2_resamples <- vfold_cv(fco2_train, v = 5)
+```
+
+
+## REDE NEURAL ARTIFICIAL
+```{r}
+fco2_recipe <- recipe(fco2 ~ ., 
+                      data = fco2_train %>% 
+            select(fco2:inso) 
+) %>%  
+  step_normalize(all_numeric_predictors())  %>% 
+  step_naomit() %>%  
+  step_novel(all_nominal_predictors()) %>% 
+  step_zv(all_predictors()) %>%
+  # step_naomit(c(ts, us)) %>% 
+  step_impute_median(where(is.numeric)) %>% # inputação da mediana nos numéricos
+  # step_poly(c(Us,Ts), degree = 2)  %>%  
+  step_dummy(all_nominal_predictors())
+bake(prep(fco2_recipe), new_data = NULL)
+```
+
+#### Definição do Modelo de RNA - MultiLayer Perceptron
+```{r}
+fco2_nn_model <- mlp(
+  hidden_units = 4) %>% # margin sempre para regressão
+  set_mode("regression") %>%
+  set_engine("nnet")
+```
+
+#### Definir os parâmetros da tunagem
+
+```{r}
+fco2_nn_model <- mlp(
+  hidden_units = tune(),
+  penalty = tune(),
+  epochs = tune()
+  ) %>% # margin sempre para regressão
+  set_mode("regression") %>%
+  set_engine("nnet")
+```
+
+#### Workflow e tunagem
+
+```{r}
+fco2_nn_wf <- workflow()   %>%
+  add_model(fco2_nn_model) %>%
+  add_recipe(fco2_recipe)
+# Criando a matriz (grid) com os valores de hiperparâmetros a serem testados
+# grid_nn <- expand.grid(
+#   hidden_units = c(1,5,6,7,8,15), #c(1,5,6,7,8,15)
+#   penalty = c(1,20),  #c(1,5,10,20)
+#   epochs = c(50,1000) # c(50,100,500,1000)
+# )
+
+grid_nn <- grid_regular(
+  hidden_units(range = c(2, 10)), ## tentar até 250
+  penalty(range = c(3, 10)), ## no máximo 30
+  epochs(range = c(5, 10)),
+  levels = c(2, 2, 2)
+)
+glimpse(grid_nn)
+
+fco2_nn_tune_grid <- tune_grid(
+  fco2_nn_wf,
+  resamples = fco2_resamples,
+  grid = grid_nn,
+  metrics = metric_set(rmse)
+)
+autoplot(fco2_nn_tune_grid)
+```
+
+### Coletando métricas
+```{r}
+collect_metrics(fco2_nn_tune_grid)
+fco2_nn_tune_grid %>%
+  show_best(metric = "rmse", n = 6)
+```
+
+### Desempenho do modelo final
+```{r}
+fco2_nn_best_params <- select_best(fco2_nn_tune_grid, metric = "rmse")
+fco2_nn_wf <- fco2_nn_wf %>%
+  finalize_workflow(fco2_nn_best_params)
+fco2_nn_last_fit <- last_fit(fco2_nn_wf, fco2_initial_split)
+
+## Criando os preditos
+fco2_test_preds <- bind_rows(
+  collect_predictions(fco2_nn_last_fit)  %>%
+    mutate(modelo = "nn"))
+
+fco2_test <- testing(fco2_initial_split)
+
+fco2_test_preds %>%
+  ggplot(aes(x=.pred, y=fco2)) +
+  geom_point()+
+  theme_bw() +
+  geom_smooth(method = "lm") +
+  stat_regline_equation(ggplot2::aes(
+  label =  paste(..eq.label.., ..rr.label.., sep = "*plain(\",\")~~"))) +
+  geom_abline (slope=1, linetype = "dashed", color="Red")
+```
+```{r}
+fco2_nn_last_fit_model <- fco2_nn_last_fit$.workflow[[1]]$fit$fit
+vip(fco2_nn_last_fit_model,
+    aesthetics = list(color = "black", fill = "orange")) +
+    theme(axis.text.y=element_text(size=rel(1.5)),
+          axis.text.x=element_text(size=rel(1.5)),
+          axis.title.x=element_text(size=rel(1.5))
+          ) +
+  theme_bw()
+```
+
+```{r, eval=FALSE}
+features <- rownames(fco2_nn_last_fit_model$fit$importance)
+importance_top_10 <- fco2_nn_last_fit_model$fit$importance |> 
+  as_tibble() |> 
+  add_column(feature = features) |> 
+  arrange(desc(IncNodePurity)) |> 
+  relocate(feature) |> 
+  slice(1:10)
+
+atr_fisicos <- features[c(14:17,19:21)]
+atr_quimicos <- features[c(4:13)]
+atr_dinamicos <- features[c(2,3,18)]
+atr_climaticos <- features[c(22:34)]
+atr_orbitais <- features[c(35:36)]
+
+importance_top_10 |> 
+  arrange(IncNodePurity) |> 
+  mutate(feature_type = case_when(
+    feature %in% atr_fisicos   ~ "físicos",
+    feature %in% atr_quimicos  ~ "químicos",
+    feature %in% atr_dinamicos ~ "dinâmicos",
+    feature %in% atr_climaticos ~ "climáticos",
+    feature %in% atr_orbitais  ~ "orbitais",
+    TRUE                        ~ "outro"
+  ),
+  feature = feature |> fct_reorder(IncNodePurity)) |> 
+  ggplot(aes(x=IncNodePurity, y=feature, fill = feature_type)) +
+  geom_col(color="black") +
+  theme_bw()+
+  labs(x = "Importância",y="",
+       fill="Grupo") +
+  theme(legend.position = "top") +
+  scale_fill_viridis_d()
+```
+
+
+### Principais Métricas
+
+```{r}
+da <- fco2_test_preds %>%
+  filter(fco2 > 0, .pred>0 )
+
+my_r <- cor(da$fco2,da$.pred)
+my_r2 <- my_r*my_r
+my_mse <- Metrics::mse(da$fco2,da$.pred)
+my_rmse <- Metrics::rmse(da$fco2,
+                         da$.pred)
+my_mae <- Metrics::mae(da$fco2,da$.pred)
+my_mape <- Metrics::mape(da$fco2,da$.pred)*100
+
+vector_of_metrics <- c(r=my_r, R2=my_r2, MSE=my_mse, RMSE=my_rmse, MAE=my_mae, MAPE=my_mape)
+print(data.frame(vector_of_metrics))
+#>      vector_of_metrics
+#> r            0.6787708
+#> R2           0.4607298
+#> MSE          0.1984555
+#> RMSE         0.4454834
+#> MAE          0.3259117
+#> MAPE        25.2042723
+```
+

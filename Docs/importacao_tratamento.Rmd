@@ -151,4 +151,8 @@ group_by(year,cultura) |>
   
 ```
 
+### Salvando a base
+```{r}
+write_rds(data_set,"../data/data-set.rds")
+```
 
