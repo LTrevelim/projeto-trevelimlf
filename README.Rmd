@@ -9,7 +9,7 @@ knitr::opts_chunk$set(
   collapse = TRUE,
   warning = FALSE, message = FALSE, error = FALSE,
   comment = "#>"
-)
+) 
 ```
 
 # APRENDIZADO DE MÁQUINA ESTATÍSTICO PARA ESTIMATIVA DA EMISSÃO DE CO~2~ DO SOLO EM ÁREAS AGRÍCOLAS
@@ -49,13 +49,27 @@ data_set <- read_rds("data/data-set.rds")
 glimpse(data_set)
 ```
 
+
+##### Extraindo o grupo de variáveis
+```{r}
+time_var <- data_set |> select(data:month) |> names()
+catego_var <- data_set |> select(cultura, manejo, tratamento) |> names()
+din_var <- data_set |> select(fco2:us,pla) |> names()
+chemical_var <- data_set |> select(ph:v,hlifs) |> names()
+physical_var <- data_set |> select(ds:vtp) |> names()
+textural_var <- data_set |> select(at:arg) |> names()
+textural_var <- data_set |> select(at:arg) |> names()
+orbital_var <- data_set |> select(xco2_trend:sif) |> names()
+meteorological_var <- data_set |> select(tmed:inso) |> names()
+```
+
 ### Dividindo a base entre treino e teste
 ```{r}
 fco2_initial_split <- initial_split(data_set, prop = 0.80)
 fco2_train <- training(fco2_initial_split)
 # fco2_test <- testing(fco2_initial_split)
 # visdat::vis_miss(fco2_test)
-fco2_train  %>% 
+fco2_train  |>  
   ggplot(aes(x=fco2, y=..density..))+
   geom_histogram(bins = 30, color="black",  fill="lightgray")+
   geom_density(alpha=.05,fill="red")+
@@ -65,7 +79,7 @@ fco2_train  %>%
 
 ```{r}
 fco2_testing <- testing(fco2_initial_split)
-fco2_testing  %>% 
+fco2_testing  |>  
   ggplot(aes(x=fco2, y=..density..))+
   geom_histogram(bins = 30, color="black",  fill="lightgray")+
   geom_density(alpha=.05,fill="blue")+
@@ -83,25 +97,24 @@ fco2_resamples <- vfold_cv(fco2_train, v = 5)
 ## REDE NEURAL ARTIFICIAL
 ```{r}
 fco2_recipe <- recipe(fco2 ~ ., 
-                      data = fco2_train %>% 
-            select(fco2:inso) 
-) %>%  
-  step_normalize(all_numeric_predictors())  %>% 
-  step_naomit() %>%  
-  step_novel(all_nominal_predictors()) %>% 
-  step_zv(all_predictors()) %>%
-  # step_naomit(c(ts, us)) %>% 
-  step_impute_median(where(is.numeric)) %>% # inputação da mediana nos numéricos
-  # step_poly(c(Us,Ts), degree = 2)  %>%  
-  step_dummy(all_nominal_predictors())
+                      data = fco2_train |>  
+            select(year,manejo, fco2:inso, -xco2_trend) # 
+) |>   
+  # step_naomit(all_outcomes()) |>  # remove linhas sem fco2  
+  step_naomit(c(ts, us)) |>  # retira NAs somente de ts e us
+  step_novel(all_nominal_predictors()) |>  # evitar problemas quando aparece categoria nova
+  step_zv(all_predictors()) |> # evita problemas com variância zero 
+  step_poly(c(us,ts), degree = 2)  |> #polinômios de us e ts de grau 2  
+  step_impute_median(all_numeric_predictors()) |>  # inputação da mediana - antes de normalize
+  step_normalize(all_numeric_predictors())  |>  # padronização normal (x-mu)/sigmma
+  step_dummy(all_nominal_predictors()) # converte fatores em variáveis binárias
 bake(prep(fco2_recipe), new_data = NULL)
 ```
 
 #### Definição do Modelo de RNA - MultiLayer Perceptron
 ```{r}
-fco2_nn_model <- mlp(
-  hidden_units = 4) %>% # margin sempre para regressão
-  set_mode("regression") %>%
+fco2_nn_model <- mlp() |>  # margin sempre para regressão
+  set_mode("regression") |> 
   set_engine("nnet")
 ```
 
@@ -112,16 +125,16 @@ fco2_nn_model <- mlp(
   hidden_units = tune(),
   penalty = tune(),
   epochs = tune()
-  ) %>% # margin sempre para regressão
-  set_mode("regression") %>%
+  ) |>  # margin sempre para regressão
+  set_mode("regression") |> 
   set_engine("nnet")
 ```
 
 #### Workflow e tunagem
 
 ```{r}
-fco2_nn_wf <- workflow()   %>%
-  add_model(fco2_nn_model) %>%
+fco2_nn_wf <- workflow()   |> 
+  add_model(fco2_nn_model) |> 
   add_recipe(fco2_recipe)
 # Criando a matriz (grid) com os valores de hiperparâmetros a serem testados
 # grid_nn <- expand.grid(
@@ -131,10 +144,10 @@ fco2_nn_wf <- workflow()   %>%
 # )
 
 grid_nn <- grid_regular(
-  hidden_units(range = c(2, 10)), ## tentar até 250
-  penalty(range = c(3, 10)), ## no máximo 30
-  epochs(range = c(5, 10)),
-  levels = c(2, 2, 2)
+  hidden_units(range = c(2, 128)), ## tentar até 250
+  penalty(range = c(-5, 0), trans = scales::log10_trans()), ## no máximo 30
+  epochs(range = c(20, 300)),
+  levels = c(3, 3, 3)
 )
 glimpse(grid_nn)
 
@@ -150,25 +163,25 @@ autoplot(fco2_nn_tune_grid)
 ### Coletando métricas
 ```{r}
 collect_metrics(fco2_nn_tune_grid)
-fco2_nn_tune_grid %>%
+fco2_nn_tune_grid |> 
   show_best(metric = "rmse", n = 6)
 ```
 
 ### Desempenho do modelo final
 ```{r}
 fco2_nn_best_params <- select_best(fco2_nn_tune_grid, metric = "rmse")
-fco2_nn_wf <- fco2_nn_wf %>%
+fco2_nn_wf <- fco2_nn_wf |> 
   finalize_workflow(fco2_nn_best_params)
 fco2_nn_last_fit <- last_fit(fco2_nn_wf, fco2_initial_split)
 
 ## Criando os preditos
 fco2_test_preds <- bind_rows(
-  collect_predictions(fco2_nn_last_fit)  %>%
+  collect_predictions(fco2_nn_last_fit)  |> 
     mutate(modelo = "nn"))
 
 fco2_test <- testing(fco2_initial_split)
 
-fco2_test_preds %>%
+fco2_test_preds |> 
   ggplot(aes(x=.pred, y=fco2)) +
   geom_point()+
   theme_bw() +
@@ -177,6 +190,7 @@ fco2_test_preds %>%
   label =  paste(..eq.label.., ..rr.label.., sep = "*plain(\",\")~~"))) +
   geom_abline (slope=1, linetype = "dashed", color="Red")
 ```
+
 ```{r}
 fco2_nn_last_fit_model <- fco2_nn_last_fit$.workflow[[1]]$fit$fit
 vip(fco2_nn_last_fit_model,
@@ -188,46 +202,40 @@ vip(fco2_nn_last_fit_model,
   theme_bw()
 ```
 
-```{r, eval=FALSE}
-features <- rownames(fco2_nn_last_fit_model$fit$importance)
-importance_top_10 <- fco2_nn_last_fit_model$fit$importance |> 
-  as_tibble() |> 
-  add_column(feature = features) |> 
-  arrange(desc(IncNodePurity)) |> 
-  relocate(feature) |> 
+```{r}
+importance_top_10 <- vi(fco2_nn_last_fit_model) |> 
+  arrange(desc(Importance)) |> 
   slice(1:10)
 
-atr_fisicos <- features[c(14:17,19:21)]
-atr_quimicos <- features[c(4:13)]
-atr_dinamicos <- features[c(2,3,18)]
-atr_climaticos <- features[c(22:34)]
-atr_orbitais <- features[c(35:36)]
-
 importance_top_10 |> 
-  arrange(IncNodePurity) |> 
   mutate(feature_type = case_when(
-    feature %in% atr_fisicos   ~ "físicos",
-    feature %in% atr_quimicos  ~ "químicos",
-    feature %in% atr_dinamicos ~ "dinâmicos",
-    feature %in% atr_climaticos ~ "climáticos",
-    feature %in% atr_orbitais  ~ "orbitais",
-    TRUE                        ~ "outro"
+    Variable %in% physical_var   ~ "físicos",
+    Variable %in% chemical_var  ~ "químicos",
+    Variable %in% din_var ~ "dinâmicos",
+    Variable %in% meteorological_var ~ "climáticos",
+    Variable %in% orbital_var  ~ "orbitais",
+    Variable %in% textural_var  ~ "textura",
+    Variable %in% time_var  ~ "tempo",
+    TRUE                        ~ "manejo"
   ),
-  feature = feature |> fct_reorder(IncNodePurity)) |> 
-  ggplot(aes(x=IncNodePurity, y=feature, fill = feature_type)) +
+  Variable = Variable |> fct_reorder(Importance)) |> 
+  ggplot(aes(x=Importance, y=Variable, fill = feature_type)) +
   geom_col(color="black") +
   theme_bw()+
   labs(x = "Importância",y="",
        fill="Grupo") +
   theme(legend.position = "top") +
   scale_fill_viridis_d()
+
+fco2_nn_last_fit_model$censor_probs |> str()
+
 ```
 
 
 ### Principais Métricas
 
 ```{r}
-da <- fco2_test_preds %>%
+da <- fco2_test_preds |> 
   filter(fco2 > 0, .pred>0 )
 
 my_r <- cor(da$fco2,da$.pred)
