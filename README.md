@@ -257,7 +257,7 @@ fco2_nn_last_fit_model$censor_probs |> str()
 
 ``` r
 da <- fco2_test_preds |> 
-  filter(fco2 > 0, .pred>0 )
+  filter(fco2 > 0, .pred > 0)
 
 my_r <- cor(da$fco2,da$.pred)
 my_r2 <- my_r*my_r

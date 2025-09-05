@@ -246,7 +246,7 @@ fco2_nn_last_fit_model$censor_probs |> str()
 
 ### Principais Métricas
 
-```{r}
+```{r} 
 da <- fco2_test_preds |> 
   filter(fco2 > 0, .pred > 0)
 
