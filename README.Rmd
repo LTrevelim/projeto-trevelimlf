@@ -98,16 +98,16 @@ fco2_resamples <- vfold_cv(fco2_train, v = 5)
 
 fco2_recipe <- recipe(fco2 ~ ., 
                       data = fco2_train |>  
-            select(year,manejo, fco2:inso, -xco2_trend) # 
+            select(fco2:inso, -xco2_trend) # 
 ) |>   
   # step_naomit(all_outcomes()) |>  # remove linhas sem fco2  
   step_naomit(c(ts, us)) |>  # retira NAs somente de ts e us
-  step_novel(all_nominal_predictors()) |>  # evitar problemas quando aparece categoria nova
+  # step_novel(all_nominal_predictors()) |>  # evitar problemas quando aparece categoria nova
   step_zv(all_predictors()) |> # evita problemas com variância zero 
   # step_poly(c(us,ts), degree = 2)  |> #polinômios de us e ts de grau 2  
   step_impute_median(all_numeric_predictors()) |>  # inputação da mediana - antes de normalize
-  step_normalize(all_numeric_predictors())  |>  # padronização normal (x-mu)/sigmma
-  step_dummy(all_nominal_predictors()) # converte fatores em variáveis binárias
+  step_normalize(all_numeric_predictors())  #|>   padronização normal (x-mu)/sigmma
+  # step_dummy(all_nominal_predictors()) # converte fatores em variáveis binárias
 bake(prep(fco2_recipe), new_data = NULL)
 ```
 
@@ -193,31 +193,32 @@ saveRDS(fco2_modelo_final, "models/fco2_modelo_svm_.rds")
 
 
 ```{r}
-rec <- fco2_svm_last_fit |> extract_recipe()
-train_processed <- bake(rec, new_data = fco2_train)
+# Extract the actual training data from your workflow
+training_data <- fco2_svm_last_fit$.workflow[[1]]$pre$mold$predictors
+training_target <- fco2_svm_last_fit$.workflow[[1]]$pre$mold$outcomes$fco2
 
-fco2_svm_last_fit |> 
+# First, create the vip plot and store it
+vip_plot <- fco2_modelo_final |> 
   extract_fit_parsnip() |>  
-  vip(
+  vip( 
     method = "permute", 
     target = "fco2", 
     metric = "rmse", 
     nsim = 5, 
-    pred_wrapper = function(object, newdata) 
-      as.vector(kernlab::predict(object, newdata)), 
-    train = train_processed, 
-    aesthetics = list(color = "black", fill = "orange")
-  ) +
+    pred_wrapper = function(object, newdata) {
+      workflow_pred <- fco2_svm_last_fit$.workflow[[1]]
+      predict(workflow_pred, newdata) %>% pull(.pred)
+    },
+    train = fco2_train,
+    aesthetics = list(color = "black", fill = "orange")) + 
   theme(axis.text.y=element_text(size=rel(1.5)), 
         axis.text.x=element_text(size=rel(1.5)), 
-        axis.title.x=element_text(size=rel(1.5))) +
-  theme_bw()
+        axis.title.x=element_text(size=rel(1.5))
+  )
 ```
 
 ```{r}
-importance_top_10 <- vi(fco2_svm_last_fit_model) |> 
-  arrange(desc(Importance)) |> 
-  slice(1:10)
+importance_top_10 <- vip_plot$data
 
 importance_top_10 |> 
   mutate(feature_type = case_when(
@@ -243,12 +244,11 @@ fco2_nn_last_fit_model$censor_probs |> str()
 
 ```
 
-
 ### Principais Métricas
 
 ```{r}
 da <- fco2_test_preds |> 
-  filter(fco2 > 0, .pred>0 )
+  filter(fco2 > 0, .pred > 0)
 
 my_r <- cor(da$fco2,da$.pred)
 my_r2 <- my_r*my_r
