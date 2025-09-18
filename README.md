@@ -106,9 +106,9 @@ fco2_recipe <- recipe(fco2 ~ .,
                       data = fco2_train |>  
             select(fco2:inso, -xco2_trend) # 
 ) |>   
-  # step_naomit(all_outcomes()) |>  # remove linhas sem fco2  
+  step_naomit(all_outcomes()) |>  # remove linhas sem fco2  
   step_naomit(c(ts, us)) |>  # retira NAs somente de ts e us
-  # step_novel(all_nominal_predictors()) |>  # evitar problemas quando aparece categoria nova
+  step_novel(all_nominal_predictors()) |>  # evitar problemas quando aparece categoria nova
   step_zv(all_predictors()) |> # evita problemas com variância zero 
   # step_poly(c(us,ts), degree = 2)  |> #polinômios de us e ts de grau 2  
   step_impute_median(all_numeric_predictors()) |>  # inputação da mediana - antes de normalize
@@ -117,70 +117,61 @@ fco2_recipe <- recipe(fco2 ~ .,
 bake(prep(fco2_recipe), new_data = NULL)
 ```
 
-## SUPPORT VECTOR MACHINE - RDF
-
-#### ϵ-insensitive loss regression (Flavor).
-
-<https://bradleyboehmke.github.io/HOML/svm.html>
-<https://stackoverflow.com/questions/77735850/variable-importance-plot-for-support-vector-machine-with-tidymodel-framework-is>
-
-#### Definição do Modelo de Função de Base Radial
+## Decision TREE - DT
 
 #### Definir os parâmetros da tunagem
 
 ``` r
-fco2_svm_model <- svm_rbf(
-  cost = tune(), 
-  rbf_sigma = tune(), 
-  margin = tune()) |>  # margin sempre para regressão -->
-  set_mode("regression") |> 
-  set_engine("kernlab") #%>% -->
- #translate() -->
+fco2_dt_model <- decision_tree(
+ cost_complexity = tune(), # Quanto maior mais poda é realizada na árvore,
+ tree_depth = tune(),  # Limitar evita criação de regras complexas 
+ min_n = tune() #número mín de obs em um nó para ser / em sub-nós.
+)  |> 
+set_mode("regression")  |> 
+ set_engine("rpart")
 ```
 
 #### Workflow e tunagem
 
 ``` r
-fco2_svm_wf <- workflow()   |> 
-  add_model(fco2_svm_model) |> 
+fco2_dt_wf <- workflow()   |> 
+  add_model(fco2_dt_model) |> 
   add_recipe(fco2_recipe)
 
-grid_svm <- expand.grid( 
-  cost = c(0.01), #0.0625, 0.1, 1, 10, 20,
-  rbf_sigma = c(0.001),  #0.095,
-  margin = c(-3,-2) # 0.025,
-)
-glimpse(grid_svm)
+grid_dt <- grid_regular( 
+  cost_complexity(c(-6, -2)), 
+  tree_depth(range = c(8, 80)), 
+  min_n(range = c(20, 100)), 
+  levels = 5) #<---------------------
 
-fco2_svm_tune_grid <- tune_grid(
-  fco2_svm_wf,
+fco2_dt_tune_grid <- tune_grid( 
+  fco2_dt_wf,
   resamples = fco2_resamples,
-  grid = grid_svm,
-  metrics = metric_set(rmse)
-)
-autoplot(fco2_svm_tune_grid)
+  grid = grid_dt,
+  metrics = metric_set(rmse) )
+autoplot(fco2_dt_tune_grid)
 ```
 
 ### Coletando métricas
 
 ``` r
-collect_metrics(fco2_svm_tune_grid)
-fco2_svm_tune_grid |> 
+collect_metrics(fco2_dt_tune_grid)
+fco2_dt_tune_grid |> 
   show_best(metric = "rmse", n = 6)
 ```
 
 ### Desempenho do modelo final
 
 ``` r
-fco2_svm_best_params <- select_best(fco2_svm_tune_grid, metric = "rmse")
-fco2_svm_wf <- fco2_svm_wf |> 
-  finalize_workflow(fco2_svm_best_params)
-fco2_svm_last_fit <- last_fit(fco2_svm_wf, fco2_initial_split)
+fco2_dt_best_params <- select_best(fco2_dt_tune_grid, metric = "rmse")
+fco2_dt_wf <- fco2_dt_wf |> 
+  finalize_workflow(fco2_dt_best_params)
+fco2_dt_last_fit <- last_fit(fco2_dt_wf, fco2_initial_split)
 
 ## Criando os preditos
 fco2_test_preds <- bind_rows(
-  collect_predictions(fco2_svm_last_fit)  |> 
-    mutate(modelo = "svm"))
+  collect_predictions(fco2_dt_last_fit)  |> 
+    mutate(modelo = "dt"))
 
 fco2_test <- testing(fco2_initial_split)
 
@@ -197,38 +188,26 @@ fco2_test_preds |>
 ## Salvando o modelo final
 
 ``` r
-fco2_modelo_final <- fco2_svm_wf |> 
+fco2_modelo_final <- fco2_dt_wf |> 
   fit(data_set)
-saveRDS(fco2_modelo_final, "models/fco2_modelo_svm_.rds")
+saveRDS(fco2_modelo_final, "models/fco2_modelo_dt_.rds")
 ```
 
 ``` r
 # Extract the actual training data from your workflow
-training_data <- fco2_svm_last_fit$.workflow[[1]]$pre$mold$predictors
-training_target <- fco2_svm_last_fit$.workflow[[1]]$pre$mold$outcomes$fco2
-
-# First, create the vip plot and store it
-vip_plot <- fco2_modelo_final |> 
-  extract_fit_parsnip() |>  
-  vip( 
-    method = "permute", 
-    target = "fco2", 
-    metric = "rmse", 
-    nsim = 5, 
-    pred_wrapper = function(object, newdata) {
-      workflow_pred <- fco2_svm_last_fit$.workflow[[1]]
-      predict(workflow_pred, newdata) %>% pull(.pred)
-    },
-    train = fco2_train,
-    aesthetics = list(color = "black", fill = "orange")) + 
-  theme(axis.text.y=element_text(size=rel(1.5)), 
-        axis.text.x=element_text(size=rel(1.5)), 
-        axis.title.x=element_text(size=rel(1.5))
-  )
+ fco2_dt_last_fit_model <-fco2_dt_last_fit$.workflow[[1]]$fit$fit
+ vip(fco2_dt_last_fit_model,
+     aesthetics = list(color = "black", fill = "orange")) +
+     theme(axis.text.y=element_text(size=rel(1.5)),
+           axis.text.x=element_text(size=rel(1.5)),
+           axis.title.x=element_text(size=rel(1.5))
+           )
 ```
 
 ``` r
-importance_top_10 <- vip_plot$data
+importance_top_10 <- vi(fco2_dt_last_fit_model) |> 
+  arrange(desc(Importance)) |> 
+  slice(1:10)
 
 importance_top_10 |> 
   mutate(feature_type = case_when(
@@ -278,8 +257,156 @@ print(data.frame(vector_of_metrics))
 #> MAPE        25.2042723
 ```
 
+Visualização da árvore
+
+``` r
+tree_fit_rpart <- extract_fit_engine(fco2_dt_last_fit) 
+  png("output/decision-tree.png",         # File name
+       width = 1900, height = 1000)
+    rpart.plot::rpart.plot(tree_fit_rpart,cex=.8,roundint=FALSE)
+    dev.off()
+```
+
 <!--
-## REDE NEURAL ARTIFICIAL
+## SUPPORT VECTOR MACHINE - RDF
+#### ϵ-insensitive loss regression (Flavor).
+https://bradleyboehmke.github.io/HOML/svm.html
+https://stackoverflow.com/questions/77735850/variable-importance-plot-for-support-vector-machine-with-tidymodel-framework-is
+&#10;#### Definição do Modelo de Função de Base Radial
+&#10;#### Definir os parâmetros da tunagem
+&#10;
+``` r
+fco2_svm_model <- svm_rbf(
+  cost = tune(), 
+  rbf_sigma = tune(), 
+  margin = tune()) |>  # margin sempre para regressão
+  set_mode("regression") |> 
+  set_engine("kernlab") #%>%
+ #translate()
+```
+&#10;#### Workflow e tunagem
+&#10;
+``` r
+fco2_svm_wf <- workflow()   |> 
+  add_model(fco2_svm_model) |> 
+  add_recipe(fco2_recipe)
+&#10;grid_svm <- expand.grid( 
+  cost = c(0.01), #0.0625, 0.1, 1, 10, 20,
+  rbf_sigma = c(0.001),  #0.095,
+  margin = c(-3,-2) # 0.025,
+)
+glimpse(grid_svm)
+&#10;fco2_svm_tune_grid <- tune_grid(
+  fco2_svm_wf,
+  resamples = fco2_resamples,
+  grid = grid_svm,
+  metrics = metric_set(rmse)
+)
+autoplot(fco2_svm_tune_grid)
+```
+&#10;### Coletando métricas
+&#10;``` r
+collect_metrics(fco2_svm_tune_grid)
+fco2_svm_tune_grid |> 
+  show_best(metric = "rmse", n = 6)
+```
+&#10;### Desempenho do modelo final
+&#10;``` r
+fco2_svm_best_params <- select_best(fco2_svm_tune_grid, metric = "rmse")
+fco2_svm_wf <- fco2_svm_wf |> 
+  finalize_workflow(fco2_svm_best_params)
+fco2_svm_last_fit <- last_fit(fco2_svm_wf, fco2_initial_split)
+&#10;## Criando os preditos
+fco2_test_preds <- bind_rows(
+  collect_predictions(fco2_svm_last_fit)  |> 
+    mutate(modelo = "svm"))
+&#10;fco2_test <- testing(fco2_initial_split)
+&#10;fco2_test_preds |> 
+  ggplot(aes(x=.pred, y=fco2)) +
+  geom_point()+
+  theme_bw() +
+  geom_smooth(method = "lm") +
+  stat_regline_equation(ggplot2::aes(
+  label =  paste(..eq.label.., ..rr.label.., sep = "*plain(\",\")~~"))) +
+  geom_abline (slope=1, linetype = "dashed", color="Red")
+```
+&#10;## Salvando o modelo final
+&#10;``` r
+fco2_modelo_final <- fco2_svm_wf |> 
+  fit(data_set)
+saveRDS(fco2_modelo_final, "models/fco2_modelo_svm_.rds")
+```
+&#10;
+&#10;``` r
+# Extract the actual training data from your workflow
+training_data <- fco2_svm_last_fit$.workflow[[1]]$pre$mold$predictors
+training_target <- fco2_svm_last_fit$.workflow[[1]]$pre$mold$outcomes$fco2
+&#10;# First, create the vip plot and store it
+vip_plot <- fco2_modelo_final |> 
+  extract_fit_parsnip() |>  
+  vip( 
+    method = "permute", 
+    target = "fco2", 
+    metric = "rmse", 
+    nsim = 5, 
+    pred_wrapper = function(object, newdata) {
+      workflow_pred <- fco2_svm_last_fit$.workflow[[1]]
+      predict(workflow_pred, newdata) %>% pull(.pred)
+    },
+    train = fco2_train,
+    aesthetics = list(color = "black", fill = "orange")) + 
+  theme(axis.text.y=element_text(size=rel(1.5)), 
+        axis.text.x=element_text(size=rel(1.5)), 
+        axis.title.x=element_text(size=rel(1.5))
+  )
+```
+&#10;
+``` r
+importance_top_10 <- vip_plot$data
+&#10;importance_top_10 |> 
+  mutate(feature_type = case_when(
+    Variable %in% physical_var   ~ "físicos",
+    Variable %in% chemical_var  ~ "químicos",
+    Variable %in% din_var ~ "dinâmicos",
+    Variable %in% meteorological_var ~ "climáticos",
+    Variable %in% orbital_var  ~ "orbitais",
+    Variable %in% textural_var  ~ "textura",
+    Variable %in% time_var  ~ "tempo",
+    TRUE                        ~ "manejo"
+  ),
+  Variable = Variable |> fct_reorder(Importance)) |> 
+  ggplot(aes(x=Importance, y=Variable, fill = feature_type)) +
+  geom_col(color="black") +
+  theme_bw()+
+  labs(x = "Importância",y="",
+       fill="Grupo") +
+  theme(legend.position = "top") +
+  scale_fill_viridis_d()
+&#10;fco2_nn_last_fit_model$censor_probs |> str()
+&#10;```
+&#10;### Principais Métricas
+&#10;
+``` r
+da <- fco2_test_preds |> 
+  filter(fco2 > 0, .pred > 0)
+&#10;my_r <- cor(da$fco2,da$.pred)
+my_r2 <- my_r*my_r
+my_mse <- Metrics::mse(da$fco2,da$.pred)
+my_rmse <- Metrics::rmse(da$fco2,
+                         da$.pred)
+my_mae <- Metrics::mae(da$fco2,da$.pred)
+my_mape <- Metrics::mape(da$fco2,da$.pred)*100
+&#10;vector_of_metrics <- c(r=my_r, R2=my_r2, MSE=my_mse, RMSE=my_rmse, MAE=my_mae, MAPE=my_mape)
+print(data.frame(vector_of_metrics))
+#>      vector_of_metrics
+#> r            0.6787708
+#> R2           0.4607298
+#> MSE          0.1984555
+#> RMSE         0.4454834
+#> MAE          0.3259117
+#> MAPE        25.2042723
+```
+&#10;## REDE NEURAL ARTIFICIAL
 #### Definição do Modelo de RNA - MultiLayer Perceptron
 &#10;``` r
 fco2_nn_model <- mlp() |>  # margin sempre para regressão
